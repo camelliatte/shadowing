@@ -24,7 +24,8 @@ header p{margin:2px 0 10px;color:var(--muted);font-size:13px}
 .bar{padding:10px 0;border-bottom:1px solid var(--line)}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 .row:first-child{margin-top:0}
-.cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.cats{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:4px}
+@media (max-width:640px){.cats{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.cats::-webkit-scrollbar{display:none}}
 .chip{flex:none;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;color:var(--muted);white-space:nowrap}
 .chip b{font-weight:500;color:#6f7590;margin-left:4px;font-size:12px}
 .chip.on{background:var(--gold-soft);border-color:var(--gold);color:var(--gold);font-weight:700}
