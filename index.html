@@ -37,6 +37,13 @@ header p{margin:2px 0 10px;color:var(--muted);font-size:13px}
 select{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 8px;font-size:12.5px;color:var(--ink)}
 .tog{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:12.5px;color:var(--muted)}
 .tog.on{border-color:var(--gold);color:var(--gold)}
+.searchwrap{display:flex;gap:8px;align-items:center;margin-top:8px}
+.sbtn{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:36px;height:32px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.sbtn.on{border-color:var(--gold);color:var(--gold)}
+.sbtn svg{width:16px;height:16px}
+#q{flex:1;display:none;background:var(--panel);border:1px solid var(--gold);border-radius:10px;padding:6px 10px;font:inherit;font-size:14px;color:var(--ink);outline:none}
+#q.show{display:block}
+mark{background:rgba(212,173,92,.3);color:inherit;border-radius:3px;padding:0 1px}
 .summary{display:flex;justify-content:space-between;align-items:baseline;margin:16px 2px 10px;gap:10px;flex-wrap:wrap}
 .summary h2{font-family:"Cormorant Garamond",serif;font-size:24px;margin:0}
 .summary span{color:var(--muted);font-size:13px}
@@ -101,6 +108,10 @@ select{background:var(--panel);border:1px solid var(--line);border-radius:10px;p
 </div>
 
 <div class="bar">
+  <div class="searchwrap" style="margin-top:0;margin-bottom:8px">
+    <button class="sbtn" id="sbtn" title="문장 찾기 (/)" aria-label="문장 찾기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+    <input id="q" type="search" placeholder="영어 단어나 한글 상황으로 찾기 (예: rather, 거절, 위로)" autocomplete="off">
+  </div>
   <div class="cats" id="cats"></div>
   <div class="row">
     <span class="lbl">길이</span>
@@ -160,26 +171,31 @@ function fmtAnno(a){let h=esc(a);
 const fmtSwap=s=>esc(s).replace(/\[([^\]]+)\]/g,'<i>[$1]</i>');
 const ts=s=>{s=Math.floor(s);return s>=3600?Math.floor(s/3600)+":"+String(Math.floor(s/60)%60).padStart(2,"0")+":"+String(s%60).padStart(2,"0"):Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
 
-function filtered(){const pr=PATTERNS.find(p=>p[0]===st.pat);
+let query="";
+const qnorm=s=>s.toLowerCase().replace(/[’']/g,"'");
+function filtered(){
+  if(query){const q=qnorm(query).trim();return DATA.filter(d=>qnorm([d.s,d.sit,d.tip,d.sw,d.us,(CATS.find(c=>c[0]==d.c)||[0,""])[1]].join(" ")).includes(q));}
+  const pr=PATTERNS.find(p=>p[0]===st.pat);
   let r=DATA.filter(d=>(st.cat==0||d.c==st.cat)&&(st.len==="all"||d.L===st.len)&&(st.era==="all"||d.g===st.era)&&(!pr||pr[2].test(d.s))&&!(st.hide&&done[d.id]));
   if(st.shuf){if(!order){order={};DATA.forEach(d=>order[d.id]=Math.random());}r=r.slice().sort((a,b)=>order[a.id]-order[b.id]);}
   return r;}
 function renderCats(){const el=document.getElementById("cats");el.innerHTML="";
-  CATS.forEach(([id,name])=>{const n=id==0?DATA.length:DATA.filter(d=>d.c==id).length;const b=document.createElement("button");b.className="chip"+(st.cat==id?" on":"");b.innerHTML=(id?id+". ":"")+name+"<b>"+n+"</b>";b.onclick=()=>{st.cat=id;store.set("cat",id);shown=40;renderCats();render();};el.appendChild(b);});}
+  CATS.forEach(([id,name])=>{const n=id==0?DATA.length:DATA.filter(d=>d.c==id).length;const b=document.createElement("button");b.className="chip"+(st.cat==id?" on":"");b.innerHTML=(id?id+". ":"")+name+"<b>"+n+"</b>";b.onclick=()=>{if(query){query="";const q=document.getElementById("q");q.value="";q.classList.remove("show");document.getElementById("sbtn").classList.remove("on");}st.cat=id;store.set("cat",id);shown=40;renderCats();render();};el.appendChild(b);});}
 let current=null;
 function render(){const list=document.getElementById("list");list.innerHTML="";const r=filtered();
-  document.getElementById("title").textContent=CATS.find(c=>c[0]==st.cat)[1];
+  document.getElementById("title").textContent=query?`검색: ${query}`:CATS.find(c=>c[0]==st.cat)[1];
   const pool=DATA.filter(d=>st.cat==0||d.c==st.cat);
   document.getElementById("prog").innerHTML=`<b>${pool.filter(d=>done[d.id]).length}</b> / ${pool.length} 체크 · ${r.length}문장 표시 중`;
   if(!r.length){list.innerHTML='<div class="empty">조건에 맞는 문장이 없어.</div>';return;}
   r.slice(0,shown).forEach(d=>list.appendChild(card(d)));
   if(r.length>shown){const m=document.createElement("button");m.className="more";m.textContent=`더 보기 (${r.length-shown})`;m.onclick=()=>{shown+=40;render();};list.appendChild(m);}}
 function card(d){const c=document.createElement("div");c.className="card"+(done[d.id]?" done":"")+(current&&current.id===d.id?" active":"");c.id="c"+d.id;
-  const meta=[`<div><span class="k">상황</span>${esc(d.sit)}</div>`];
-  if(st.lvl==="1"&&d.tip)meta.push(`<div><span class="k">포인트</span>${esc(d.tip)}</div>`);
+  const hl=s=>{const e=esc(s);if(!query)return e;const q=esc(query.trim());if(!q)return e;return e.replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi"),m=>`<mark>${m}</mark>`);};
+  const meta=[`<div><span class="k">상황</span>${hl(d.sit)}</div>`];
+  if(st.lvl==="1"&&d.tip)meta.push(`<div><span class="k">포인트</span>${hl(d.tip)}</div>`);
   if(d.sw)meta.push(`<div class="sw"><span class="k">바꿔 쓰기</span>${fmtSwap(d.sw)}</div>`);
-  if(d.us)meta.push(`<div><span class="k">🇺🇸 미국식</span>${esc(d.us)}</div>`);
-  c.innerHTML=`<div class="top"><span class="badge ${d.g}">${ERA[d.g]}</span><div class="text ${st.lvl==="3"?"hidden":""}">${st.lvl==="1"?fmtAnno(d.a):esc(d.s)}</div></div>
+  if(d.us)meta.push(`<div><span class="k">🇺🇸 미국식</span>${hl(d.us)}</div>`);
+  c.innerHTML=`<div class="top"><span class="badge ${d.g}">${ERA[d.g]}</span><div class="text ${st.lvl==="3"?"hidden":""}">${st.lvl==="1"&&!query?fmtAnno(d.a):(st.lvl==="1"||st.lvl==="2"?hl(d.s):esc(d.s))}</div></div>
     <div class="meta">${meta.join("")}</div>
     <div class="ctrls">
       <button class="btn gold" data-a="play">▶ 반복 재생 <span class="tm">${ts(S(d))}</span></button>
@@ -256,6 +272,13 @@ function listen(t,c,btn){if(!SR)return;if(rec){rec.stop();return;}
  document.getElementById("imp").onclick=()=>{try{const o=JSON.parse(box.value.trim());if(typeof o!=="object"||!o.adj)throw 0;
    adj=Object.assign({},adj,o.adj);store.set("adj",adj);if(typeof o.goff==="number"){goff=o.goff;store.set("goff",goff);gv();}
    render();msg.textContent=`적용됨 (${Object.keys(o.adj).length}문장)`;}catch(e){msg.textContent="형식이 맞지 않아. 복사한 내용을 그대로 붙여넣어줘.";}};
+})();
+(function(){const b=document.getElementById("sbtn"),q=document.getElementById("q");
+  const open=v=>{q.classList.toggle("show",v);b.classList.toggle("on",v);if(v){q.focus();}else{q.value="";query="";shown=40;render();}};
+  b.onclick=()=>open(!q.classList.contains("show"));
+  let tm=null;q.oninput=()=>{clearTimeout(tm);tm=setTimeout(()=>{query=q.value.trim();shown=40;render();},150);};
+  q.onkeydown=e=>{if(e.key==="Escape")open(false);};
+  document.addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();open(true);}});
 })();
 renderCats();render();
 </script>
